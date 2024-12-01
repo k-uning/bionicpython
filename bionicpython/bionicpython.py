@@ -4,15 +4,52 @@ from docx import Document
 import os
 import argparse
 import math
+import docx
 from docx import Document
 import os
 import spacy
 import subprocess
 import sys
 import re
+import fitz  # PyMuPDF
+from docx.shared import Inches
 
+def extract_text_and_images_from_pdf(pdf_path):
+    """
+    Extracts text and images from a PDF file.
+    Returns a tuple: (text, list of image tuples)
+    Each image tuple contains: (image_bytes, image_width, image_height)
+    """
+    doc = fitz.open(pdf_path)
+    text = ""
+    images = []
+    for page in doc:
+        text += page.get_text()
+        for img in page.get_images(full=True):
+            xref = img[0]
+            pix = fitz.Pixmap(doc, xref)
+            if pix.n < 5:  # this is GRAY or RGB
+                pix1 = fitz.Pixmap(fitz.csRGB, pix)
+                pix = pix1
+            img_bytes = pix.tobytes()  # Get image data as bytes
+            img_width, img_height = pix.width, pix.height
+            images.append((img_bytes, img_width, img_height))
+            pix = None  # Free memory
+    return text, images
 
-
+def create_docx_from_text_and_images(text, images, docx_path):
+    """Creates a DOCX file with text and images."""
+    doc = docx.Document()
+    doc.add_paragraph(text)
+    for img_bytes, img_width, img_height in images:
+        try:
+            # Add a run to the document
+            run = doc.add_paragraph().add_run()
+            # Add the picture to the run
+            run.add_picture(img_bytes, width=Inches(img_width / 96))  # Adjust size as needed 
+        except Exception as e:
+            print("Error adding image to document:", e)
+    doc.save(docx_path)
 
 def process_word(word, ratio):
     # Calculate the number of characters to make bold
@@ -41,11 +78,15 @@ def process_document(doc_path, ratio):
     elif doc_path.endswith('.pdf'):
         docx_path = doc_path.replace('.pdf', '.docx')
         try:
+            # Convert the PDF to a DOCX file using pymupdf
+            text, images = extract_text_and_images_from_pdf(doc_path)
+            create_docx_from_text_and_images(text, images, docx_path)
+            
             # Run the conversion script as a subprocess
-            subprocess.run([sys.executable, 'converter.py', '--pdf', doc_path, '--docx', docx_path])
+            subprocess.run([sys.executable, './bionicpython/converter.py', '--pdf', doc_path, '--docx', docx_path])
 
             # Modify this command to run in the absolute path (with relation to this script) to converter.py
-            subprocess.run([sys.executable, 'converter.py', '--pdf', doc_path, '--docx', docx_path])
+            subprocess.run([sys.executable, './bionicpython/converter.py', '--pdf', doc_path, '--docx', docx_path])
             
             # Replace '.pdf' with '.docx' in the file path
             doc_path = docx_path
@@ -126,8 +167,13 @@ def main():
 
     process_document(args.doc_path, args.ratio)
 
+def main_ku(path,ratio=0.5):
+    process_document(path, ratio)
+
 if __name__ == '__main__':
-    main()
+    # main()
+    path = r"C:\Users\Game\Downloads\bionic test\d0an02103b.pdf"
+    main_ku(path)
 
 # def process_document(doc_path, ratio):
 #     # Check if the file path is for a .docx file
