@@ -100,26 +100,51 @@ class GUI(tk.Frame):
         super().__init__(master)
         self.master = master
         
-        self.input_text = tk.Text(self, height=10, width=50)
-        self.process_button = tk.Button(self, text="Process", command=self.process_text)
-        self.output_label = tk.Label(self, text="Output:")
-        self.output_text = tk.Text(self, height=10, width=50)
+    # > Frame setups <
+        self._frm_input = tk.Frame(self)
+        self._frm_params = tk.Frame(self)
+        self._frm_output = tk.Frame(self)
         
-        self.input_text.pack()
-        self.process_button.pack()
-        self.output_label.pack()
-        self.output_text.pack()
+        self._frm_input.grid(row=0, column=0, sticky='nsew')
+        self._frm_params.grid(row=1, column=0, sticky='nsew')
+        self._frm_output.grid(row=2, column=0, sticky='nsew')
+        
+        self.grid_rowconfigure(0, weight=0)
+        self.grid_rowconfigure(1, weight=0)
+        self.grid_rowconfigure(2, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        
+    # > Widgets <
+        self.input_text = tk.Text(self._frm_input, height=10, width=50)
+        self.process_button = tk.Button(self._frm_input, text="Process", command=self.process_text)
+        
+        self.input_text.grid(row=0, column=0, sticky='nsew')
+        self.process_button.grid(row=1, column=0, sticky='nsew')
+        
+        self._frm_input.grid_rowconfigure(0, weight=1)
+        self._frm_input.grid_rowconfigure(1, weight=0)
+        self._frm_input.grid_columnconfigure(0, weight=1)
         
         # Bind ctrl+enter to the process button
         self.process_button.bind("<Control-Return>", lambda event: self.process_text())
         
+    # > Output text <
+        self.output_text = tk.Text(self._frm_output)
+        self.output_text.grid(row=0, column=1, sticky='nsew')
+        
+        # Set auto size adjustment
+        self._frm_output.grid_rowconfigure(0, weight=1)
+        self._frm_output.grid_columnconfigure(1, weight=1)
+        
     # > Styling for the output text <
         # Set the default text options
         self.textOptions = TextOptions()
+        self._list_split = ['-',',']
+                            #,';',':','!','?','(',')','[',']','{','}','<','>','/','\\','|','@','#','$','%','^','&','*','~','`','+','=']
         
         # Set the frame for the text options
-        self.frm_textOptions = TextOptions_GUI(self, getter_TextOptions=lambda: self.textOptions)
-        self.frm_textOptions.pack()
+        self.frm_textOptions = TextOptions_GUI(self._frm_params, getter_TextOptions=lambda: self.textOptions)
+        self.frm_textOptions.grid(row=0, column=0, sticky='nsew')
 
     def process_text(self):
         """
@@ -139,7 +164,19 @@ class GUI(tk.Frame):
         list_paragraphs = input_text.split("\n")
         for paragraph in list_paragraphs:
             list_words = paragraph.split()
-            for word in list_words:
+            # list_words_final = []
+            # for word in list_words:
+            #     for symbol in self._list_split:
+            #         if symbol not in word:
+            #             list_words_final.append(word)
+            #             continue
+            #         words = word.split(symbol)
+            #         for word in words:
+            #             list_words_final.append(word)
+            #             list_words_final.append(symbol)
+            #         list_words_final.pop(-1)    # Remove the last symbol
+            list_words_final = list_words
+            for word in list_words_final:
                 wordpart_bold, wordpart_normal = self._process_word(word)
                 self.output_text.insert(tk.END, wordpart_bold, "bionic_bold")
                 self.output_text.insert(tk.END, wordpart_normal, "bionic_normal")
@@ -167,5 +204,5 @@ if __name__ == '__main__':
     app.title("Bionic Python")
     
     gui = GUI(master=app)
-    gui.pack()
+    gui.pack(fill=tk.BOTH, expand=True)
     app.mainloop()
