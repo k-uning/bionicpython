@@ -115,18 +115,28 @@ class GUI(tk.Frame):
         self.grid_columnconfigure(0, weight=1)
         
     # > Widgets <
+        self._var_ontop = tk.BooleanVar()
+        self.chk_ontop = tk.Checkbutton(self._frm_input, text="Always on top", variable=self._var_ontop)
+        self.chk_ontop.select()
+        
+        # Bind the release of the checkbutton to the always on top feature
+        self.master.attributes("-topmost", True)
+        self.chk_ontop.bind("<Button-1>", lambda event: self.master.attributes("-topmost", not self._var_ontop.get()))
+        
         self.input_text = tk.Text(self._frm_input, height=10, width=50)
         self.process_button = tk.Button(self._frm_input, text="Process", command=self.process_text)
         
-        self.input_text.grid(row=0, column=0, sticky='nsew')
-        self.process_button.grid(row=1, column=0, sticky='nsew')
+        self.chk_ontop.grid(row=0, column=0, sticky='nsew')
+        self.input_text.grid(row=1, column=0, sticky='nsew')
+        self.process_button.grid(row=2, column=0, sticky='nsew')
         
         self._frm_input.grid_rowconfigure(0, weight=1)
         self._frm_input.grid_rowconfigure(1, weight=0)
+        self._frm_input.grid_rowconfigure(2, weight=0)
         self._frm_input.grid_columnconfigure(0, weight=1)
         
         # Bind ctrl+enter to the process button
-        self.process_button.bind("<Control-Return>", lambda event: self.process_text())
+        # self.process_button.bind("<Control-Return>", lambda event: self.process_text())
         
     # > Output text <
         self.output_text = tk.Text(self._frm_output)
