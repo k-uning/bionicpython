@@ -8,7 +8,10 @@ Bionic Reading (R)'s patent on this technique).
 """
 
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import ttk, messagebox
+
+# import re
+from typing import Callable
 import math
 
 from dataclasses import dataclass
@@ -20,20 +23,31 @@ class TextOptions():
     This includes: font, size, spacing, and bionic ratio.
     """
     font: str = "Aptos Display"
-    size: int = 12
-    spacing: int = 1
-    bionic_ratio: float = 0.5
-    list_fonts = ["Aptos Display", "OpenDyslexic"]
+    size: int = 14
+    line_spacing: int = 20
+    # character_spacing: int = 1
+    bionic_ratio: float = 0.4
+    list_fonts = ["Aptos Display", "OpenDyslexic", "Comic Sans MS", "Arial", "Times New Roman", "Courier New"]
     
 class TextOptions_GUI(tk.Frame):
     """
     A GUI to set the text options for the output text.
     """
-    def __init__(self, master, getter_TextOptions:callable):
+    def __init__(self, master:tk.Frame, getter_TextOptions:Callable[[None],TextOptions],
+                 callback_sel:Callable[[None],None]):
+        """
+        Constructor for the TextOptions_GUI class.
+
+        Args:
+            master (tk.Frame): The master frame for the GUI.
+            getter_TextOptions (Callable[[None],TextOptions]): A function that returns the TextOptions object.
+            callback_sel (Callable[[None],None]): A callback function to be called when the selection is made.
+        """
         super().__init__(master)
         self.master = master
         
-        self.getter_text_options = lambda: getter_TextOptions()
+        self.getter_text_options = getter_TextOptions
+        self.callback_sel = callback_sel
         
         # Automatic widget creation subframe
         self._frm_params = tk.Frame(self)
@@ -55,11 +69,20 @@ class TextOptions_GUI(tk.Frame):
         for attr in list_attr:
             label = tk.Label(self._frm_params, text=attr)
             entry = tk.Entry(self._frm_params)
-            entry.bind("<Return>", lambda event, attr=attr, entry=entry, label=label: self._update_textOptionParams(attr,entry,label))
+            callback = self._set_selectionCallbacks(self._update_textOptionParams, {"attr":attr, "entry":entry, "label":label})
+            entry.bind("<Return>", lambda event, callback=callback: callback())
             entry.insert(0, getattr(self.getter_text_options(),attr))
             
             self._listwid_label.append(label)
             self._listwid_entry.append(entry)
+            
+        # Create a spinbox for the fonts
+        combo_font = ttk.Combobox(self._frm_params, values=self.getter_text_options().list_fonts, state='readonly')
+        combo_font.current(0)
+        
+        combo_font.grid(row=len(list_attr), column=0, columnspan=2, sticky='w')
+        callback = self._set_selectionCallbacks(lambda: setattr(self.getter_text_options(),"font",combo_font.get()), {})
+        combo_font.bind("<<ComboboxSelected>>", lambda event, callback=callback: callback())
             
         for i,tup in enumerate(zip(self._listwid_label,self._listwid_entry)):
             label, entry = tup
@@ -68,6 +91,25 @@ class TextOptions_GUI(tk.Frame):
             
             # Force a call to update the text options
             self._update_textOptionParams(list_attr[i],entry,label)
+            
+    def _set_selectionCallbacks(self,callback:Callable,kwargs:dict) -> Callable[[None],None]:
+        """
+        Sets the selection callbacks for the widgets.
+        
+        Args:
+            callback (Callable): The callback function to be set.
+            kwargs (dict): The keyword arguments to be passed to the callback function
+        
+        Returns:
+            Callable[[None],None]: A callback function to be called when the selection is made.
+        """
+        def _callback():
+            try:
+                callback(**kwargs)
+                self.callback_sel()
+            except Exception as e:
+                messagebox.showerror("Error", "_set_callbacks: \n {}".format(e))
+        return _callback
             
     def _update_textOptionParams(self,attr:str,entry:tk.Entry,label:tk.Label):
         """
@@ -135,12 +177,14 @@ class GUI(tk.Frame):
         self._frm_input.grid_rowconfigure(2, weight=0)
         self._frm_input.grid_columnconfigure(0, weight=1)
         
-        # Bind ctrl+enter to the process button
-        # self.process_button.bind("<Control-Return>", lambda event: self.process_text())
-        
     # > Output text <
-        self.output_text = tk.Text(self._frm_output)
+        self.output_text = tk.Text(self._frm_output,wrap=tk.WORD)
         self.output_text.grid(row=0, column=1, sticky='nsew')
+        
+        # Add a scrollbar to the output text
+        scrollbar = tk.Scrollbar(self._frm_output, command=self.output_text.yview)
+        self.output_text.config(yscrollcommand=scrollbar.set)
+        scrollbar.grid(row=0, column=2, sticky='ns')
         
         # Set auto size adjustment
         self._frm_output.grid_rowconfigure(0, weight=1)
@@ -153,13 +197,16 @@ class GUI(tk.Frame):
                             #,';',':','!','?','(',')','[',']','{','}','<','>','/','\\','|','@','#','$','%','^','&','*','~','`','+','=']
         
         # Set the frame for the text options
-        self.frm_textOptions = TextOptions_GUI(self._frm_params, getter_TextOptions=lambda: self.textOptions)
+        self.frm_textOptions = TextOptions_GUI(self._frm_params, getter_TextOptions=lambda: self.textOptions, callback_sel=self.process_text)
         self.frm_textOptions.grid(row=0, column=0, sticky='nsew')
 
     def process_text(self):
         """
         Processes the input text and displays the output in the output text box.
         """
+        # Update the widget
+        self.output_text.config(spacing1=self.textOptions.line_spacing, spacing2=self.textOptions.line_spacing, spacing3=self.textOptions.line_spacing)
+        
         # Update the tags
         self.tag_bold = self.output_text.tag_configure("bionic_bold", font=(self.textOptions.font, self.textOptions.size, "bold"))
         self.tag_normal = self.output_text.tag_configure("bionic_normal", font=(self.textOptions.font, self.textOptions.size, "normal"))
@@ -173,18 +220,9 @@ class GUI(tk.Frame):
         # Process the input text
         list_paragraphs = input_text.split("\n")
         for paragraph in list_paragraphs:
+            # list_words = re.findall(r'\w+-\w+|\w+|-', paragraph)
+            # list_words = re.split(r'\W+', paragraph)
             list_words = paragraph.split()
-            # list_words_final = []
-            # for word in list_words:
-            #     for symbol in self._list_split:
-            #         if symbol not in word:
-            #             list_words_final.append(word)
-            #             continue
-            #         words = word.split(symbol)
-            #         for word in words:
-            #             list_words_final.append(word)
-            #             list_words_final.append(symbol)
-            #         list_words_final.pop(-1)    # Remove the last symbol
             list_words_final = list_words
             for word in list_words_final:
                 wordpart_bold, wordpart_normal = self._process_word(word)
@@ -212,6 +250,20 @@ class GUI(tk.Frame):
 if __name__ == '__main__':
     app = tk.Tk()
     app.title("Bionic Python")
+    
+    # Get windows' screen size
+    screen_width = app.winfo_screenwidth()
+    screen_height = app.winfo_screenheight()
+    
+    # Set the window size
+    window_width = int(screen_width/5)
+    window_height = int(screen_height*3/4)
+    app.geometry("{}x{}".format(window_width,window_height))
+    
+    # Position the window on the right side of the screen
+    position_x = int(screen_width - window_width * 1.1)
+    position_y = int(screen_height/15)
+    app.geometry("+{}+{}".format(position_x,position_y))
     
     gui = GUI(master=app)
     gui.pack(fill=tk.BOTH, expand=True)
